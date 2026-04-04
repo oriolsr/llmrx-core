@@ -1,0 +1,62 @@
+{
+  "name": "llmrx-core",
+  "version": "0.1.0",
+  "description": "Reactive DG/DAG execution engine for LLM agents. Single file. One dependency (rxjs). Zero opinions about your stack.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest run",
+    "test:watch": "vitest",
+    "test:fuzz": "FUZZ_N=1000 NODE_OPTIONS='--max-old-space-size=8192' vitest run",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "llm",
+    "agent",
+    "dag",
+    "graph",
+    "rxjs",
+    "reactive",
+    "execution-engine",
+    "orchestration",
+    "policy",
+    "gates",
+    "interrupts"
+  ],
+  "author": "Oriol SR",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oriolsr/llmrx-core.git"
+  },
+  "homepage": "https://github.com/oriolsr/llmrx-core",
+  "bugs": {
+    "url": "https://github.com/oriolsr/llmrx-core/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.7"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
