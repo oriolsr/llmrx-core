@@ -90,9 +90,9 @@ describe("integration: nested graphs, budget cascade, oracle.llm(), mutation, ab
           call: async () => {
             mikeRounds++;
             if (mikeRounds === 1) {
-              return { response: "analyzing", toolCalls: [{ id: "t1", name: "research" }], cost: 0.15 };
+              return { text: "analyzing", tool_calls: [{ id: "t1", name: "research", input: {} }], cost: 0.15 };
             }
-            return { response: "mike done", toolCalls: [], cost: 0.10 };
+            return { text: "mike done", tool_calls: [], cost: 0.10 };
           },
           executeTool: async () => ({ content: "research results" }),
         });
@@ -264,7 +264,7 @@ describe("integration: nested graphs, budget cascade, oracle.llm(), mutation, ab
         expect.fail("abort deadlocked — forkJoin hung on uncompleted ReplaySubject");
       }, 3000);
 
-      graph.exec$(manifest, "donna", "go", controller.signal).subscribe({
+      graph.exec$(manifest, "donna", "go", { signal: controller.signal }).subscribe({
         next: (s) => signals.push(s),
         error: () => { errored = true; clearTimeout(timeout); resolve(); },
         complete: () => { clearTimeout(timeout); resolve(); },
@@ -296,7 +296,7 @@ describe("integration: nested graphs, budget cascade, oracle.llm(), mutation, ab
           call: async () => {
             llmCalls++;
             // Always return tool calls — loop should be killed by rounds policy
-            return { response: `round ${llmCalls}`, toolCalls: [{ id: "t1", name: "work" }] };
+            return { text: `round ${llmCalls}`, tool_calls: [{ id: "t1", name: "work", input: {} }] };
           },
           executeTool: async () => ({ content: "done" }),
         }),

@@ -72,7 +72,7 @@ executeGraph$()   graphId=g1   ancestry=[donna]   graphIds=[g1]
 │  │  │  │  │  │                                                        │    │
 │  │  │  │  │  │  4. EXECUTE (with timeout 45s, retries 2)              │    │
 │  │  │  │  │  │     → anthropic.messages.create(layers)                │    │
-│  │  │  │  │  │     → response: "route to jessica", toolCalls: []      │    │
+│  │  │  │  │  │     → text: "route to jessica", tool_calls: []         │    │
 │  │  │  │  │  │                                                        │    │
 │  │  │  │  │  │  5. POST-EXEC ACCUMULATE                              │    │
 │  │  │  │  │  │     cost.extract(result) → { prompt: 0.02, out: 0.01 }│    │
@@ -114,7 +114,7 @@ executeGraph$()   graphId=g1   ancestry=[donna]   graphIds=[g1]
 │  │  │  │  │                                                           │    │
 │  │  │  │  │  execAction$("llm:anthropic:opus", call)                  │    │
 │  │  │  │  │  │  cost: 0.03 < 10 ✓   calls: 1 < 1000 ✓               │    │
-│  │  │  │  │  │  → response: "analyze", toolCalls: [get_quote(AAPL)]  │    │
+│  │  │  │  │  │  → text: "analyze", tool_calls: [get_quote(AAPL)]    │    │
 │  │  │  │  │  │  accumulated cost: 0.03 + 0.05 = 0.08                 │    │
 │  │  │  │  │  │                                                        │    │
 │  │  │  │  │  │  execAction$("tool", get_quote)                        │    │
@@ -128,7 +128,7 @@ executeGraph$()   graphId=g1   ancestry=[donna]   graphIds=[g1]
 │  │  │  │  │                                                           │    │
 │  │  │  │  │  execAction$("llm:anthropic:opus", call)                  │    │
 │  │  │  │  │  │  cost: 0.08 < 10 ✓                                    │    │
-│  │  │  │  │  │  → response: "AAPL bullish", toolCalls: []            │    │
+│  │  │  │  │  │  → text: "AAPL bullish", tool_calls: []               │    │
 │  │  │  │  │  │  accumulated cost: 0.08 + 0.04 = 0.12                 │    │
 │  │  │  │  │  │  No tool calls → done                                  │    │
 │  │  │  │  │  └───────────────────────────────────────────────────────┘    │

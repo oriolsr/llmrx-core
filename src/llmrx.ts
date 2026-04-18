@@ -161,14 +161,34 @@ export interface NodeResult {
   signals?: Signal[];
 }
 
+/** Normalized tool call emitted by a provider. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+/** Normalized tool result fed back into the next round. */
+export interface ToolResult {
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
+/** One entry in the LLM transcript. Append-only across rounds. */
+export type Turn =
+  | { role: "user"; content: string }
+  | { role: "assistant"; text: string; tool_calls?: ToolCall[] }
+  | { role: "tool_result"; results: ToolResult[] };
+
 /** OracleExec — runtime oracle API exposed on NodeExec. */
 export interface OracleExec {
   /** LLM loop — call → tools → loop. Returns when no tool calls remain. */
   llm(opts: {
     /** Oracle key for LLM calls (e.g. "llm:anthropic:opus"). Costs accumulate up the hierarchy. */
     oracle: string;
-    call: (layers: Layer[], history: unknown[]) => Promise<{ response: string; toolCalls?: unknown[] }>;
-    executeTool?: (toolCall: unknown, ctx: NodeExec) => Promise<{ content: string; signals?: Signal[] }>;
+    call: (turns: Turn[]) => Promise<{ text: string; tool_calls?: ToolCall[] }>;
+    executeTool?: (toolCall: ToolCall, ctx: NodeExec) => Promise<{ content: string; is_error?: boolean; signals?: Signal[] }>;
   }): Observable<NodeResult>;
 
   /** Generic tracked call — any oracle, any Observable work. Wrap Promises with from(). */
@@ -1214,8 +1234,7 @@ function executeNode$(
 
       return new Observable<NodeResult>((subscriber) => {
         (async () => {
-          const currentLayers: Layer[] = [];
-          const history: unknown[] = [];
+          const turns: Turn[] = [];
           // Only collect consumer-extension signals (from executeTool results).
           // exec$ signals are already captured in nodeSignals via the tap/catchError above.
           const consumerSignals: Signal[] = [];
@@ -1227,47 +1246,49 @@ function executeNode$(
 
             // 1. LLM call via exec$ — uses consumer's oracle key for hierarchy accumulation
             const response = await lastValueFrom(
-              ctxExec$(llmOracleKey, () => from(opts.call(currentLayers, history))),
+              ctxExec$(llmOracleKey, () => from(opts.call(turns))),
             );
 
-            // 2. No tools → done
-            if (!response.toolCalls || response.toolCalls.length === 0) {
-              subscriber.next({ output: response.response, signals: consumerSignals });
+            // 2. No tools → done. Append final assistant turn for traceability, return text.
+            if (!response.tool_calls || response.tool_calls.length === 0) {
+              turns.push({ role: "assistant", text: response.text });
+              subscriber.next({ output: response.text, signals: consumerSignals });
               subscriber.complete();
               return;
             }
 
-            // 3. Tool calls via exec$
-            for (const tc of response.toolCalls) {
+            // 3. Append assistant turn with tool_calls
+            turns.push({ role: "assistant", text: response.text, tool_calls: response.tool_calls });
+
+            // 4. Execute each tool call, collect results paired by tool_use_id
+            const results: ToolResult[] = [];
+            for (const tc of response.tool_calls) {
               if (subscriber.closed) return;
               if (!opts.executeTool) {
-                currentLayers.push({ name: "tool", content: "no executeTool provided" });
+                results.push({ tool_use_id: tc.id, content: "no executeTool provided", is_error: true });
                 continue;
               }
               try {
                 const toolResult = await lastValueFrom(
                   ctxExec$("tool", () => from(opts.executeTool!(tc, nodeCtx)), tc),
                 );
-                const result = toolResult as { content: string; signals?: Signal[] };
-                currentLayers.push({ name: "tool", content: result.content });
-                // Only collect consumer-generated signals from tool results
-                if (result.signals) consumerSignals.push(...result.signals);
+                results.push({ tool_use_id: tc.id, content: toolResult.content, is_error: toolResult.is_error });
+                if (toolResult.signals) consumerSignals.push(...toolResult.signals);
               } catch (err) {
                 if (err instanceof Denied) {
-                  currentLayers.push({ name: "tool", content: JSON.stringify({ denied: true, reason: err.reason }) });
+                  results.push({ tool_use_id: tc.id, content: JSON.stringify({ denied: true, reason: err.reason }), is_error: true });
                   continue;
                 }
                 throw err;
               }
             }
+            turns.push({ role: "tool_result", results });
 
             // Accumulate "rounds" type limits (using pre-collected round limits with origin)
             // If max is exceeded, the next ctxExec$ call will throw PolicyExceeded.
             for (const { limit: rl, origin } of roundLimits) {
               ctx.policies.accumulate(origin, rl, 1, scopeOf(ctx));
             }
-
-            history.push({ response });
           }
         })().catch((err) => subscriber.error(err));
       });
@@ -1363,10 +1384,14 @@ function executeNode$(
       );
     }),
 
-    // Prepend node:before, merge eager oracle signals alongside execution
+    // Prepend node:before, merge eager oracle signals alongside execution.
+    // nodeSignals$ MUST be merged first so its subscriber is attached
+    // before source$ is subscribed — otherwise synchronous emissions from
+    // the very first ctx.exec$ inside spec.execute() are lost (Subject
+    // doesn't replay).
     (source$) => merge(
-      concat(of(emit(nodeCtxId, nodeKey, { type: "node:before" })), source$),
       nodeSignals$,
+      concat(of(emit(nodeCtxId, nodeKey, { type: "node:before" })), source$),
     ),
 
     catchError((err) => {

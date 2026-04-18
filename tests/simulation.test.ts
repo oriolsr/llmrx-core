@@ -737,16 +737,15 @@ describe("simulation: oracle.llm() loop primitive", () => {
       execute: (layers, ctx) => {
         return ctx.oracle.llm({
           oracle: "llm",
-          call: async (currentLayers, history) => {
+          call: async (_turns) => {
             callNum++;
             if (callNum === 1) {
-              return { response: "", toolCalls: [{ id: "q1", name: "market.quote", args: { symbol: "AAPL" } }] };
+              return { text: "", tool_calls: [{ id: "q1", name: "market.quote", input: { symbol: "AAPL" } }] };
             }
-            return { response: "AAPL looks good", toolCalls: [] };
+            return { text: "AAPL looks good", tool_calls: [] };
           },
-          executeTool: async (tc, ctx) => {
-            const call = tc as ToolCall;
-            state.toolCallLog.push({ node: "donna", tool: call.name, args: call.args });
+          executeTool: async (tc, _ctx) => {
+            state.toolCallLog.push({ node: "donna", tool: tc.name, args: tc.input as Record<string, unknown> });
             return { content: JSON.stringify({ price: 185.20 }) };
           },
         });
@@ -1142,11 +1141,11 @@ describe("simulation: no signal duplication in oracle.llm()", () => {
           call: async () => {
             callNum++;
             if (callNum === 1) {
-              return { response: "", toolCalls: [{ id: "q1", name: "market.quote", args: { symbol: "AAPL" } }] };
+              return { text: "", tool_calls: [{ id: "q1", name: "market.quote", input: { symbol: "AAPL" } }] };
             }
-            return { response: "done", toolCalls: [] };
+            return { text: "done", tool_calls: [] };
           },
-          executeTool: async (tc) => {
+          executeTool: async (_tc) => {
             return { content: JSON.stringify({ price: 185.20 }) };
           },
         });

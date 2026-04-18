@@ -43,7 +43,7 @@ describe("BUG: off-by-one in LLM round loop", () => {
           call: async () => {
             llmCallCount++;
             // Always return tool calls to force continuation
-            return { response: "thinking", toolCalls: [{ name: "doWork", args: {} }] };
+            return { text: "thinking", tool_calls: [{ id: "tc_1", name: "doWork", input: {} }] };
           },
           executeTool: async () => ({ content: "result of doWork" }),
         }).subscribe({

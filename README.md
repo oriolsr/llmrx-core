@@ -111,14 +111,18 @@ Call LLM, execute tools, loop. Round limits come from oracle policies.
 execute(layers, ctx) {
   return ctx.oracle.llm({
     oracle: "llm:anthropic:claude",
-    call: async (layers, history) => {
-      const r = await anthropic.messages.create({ messages: layers });
-      return {
-        response: r.content[0].text,
-        toolCalls: r.content.filter(c => c.type === "tool_use"),
-      };
+    // turns: append-only transcript of assistant + tool_result turns,
+    // grown by the engine across rounds. Your provider translates it
+    // to its wire format (Anthropic blocks, OpenAI tool_call_id, etc.)
+    // and pairs each tool_result with its tool_use_id.
+    call: async (turns) => {
+      const r = await anthropic.messages.create({ system: layers, messages: toMessages(turns) });
+      const text = r.content.find(b => b.type === "text")?.text ?? "";
+      const tool_calls = r.content.filter(b => b.type === "tool_use")
+        .map(b => ({ id: b.id, name: b.name, input: b.input }));
+      return { text, tool_calls };
     },
-    executeTool: (tc, ctx) => toolRegistry.execute(tc, ctx),
+    executeTool: (tc, ctx) => toolRegistry.execute(tc, ctx), // tc: { id, name, input }
   });
 }
 ```
@@ -355,11 +359,18 @@ interface NodeExec {
   readonly nodeId: string;
 }
 
+interface ToolCall { id: string; name: string; input: unknown; }
+interface ToolResult { tool_use_id: string; content: string; is_error?: boolean; }
+type Turn =
+  | { role: "user"; content: string }
+  | { role: "assistant"; text: string; tool_calls?: ToolCall[] }
+  | { role: "tool_result"; results: ToolResult[] };
+
 interface OracleExec {
   llm(opts: {
     oracle: string;
-    call: (layers: Layer[], history: unknown[]) => Promise<{ response: string; toolCalls?: unknown[] }>;
-    executeTool?: (tc: unknown, ctx: NodeExec) => Promise<{ content: string; signals?: Signal[] }>;
+    call: (turns: Turn[]) => Promise<{ text: string; tool_calls?: ToolCall[] }>;
+    executeTool?: (tc: ToolCall, ctx: NodeExec) => Promise<{ content: string; is_error?: boolean; signals?: Signal[] }>;
   }): Observable<NodeResult>;
   call<T>(oracle: string, fn: () => Promise<T>, input?: unknown): Observable<T>;
 }

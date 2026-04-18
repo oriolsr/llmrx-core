@@ -29,15 +29,15 @@ const greeter: Node = {
     // Use the LLM oracle — call your provider, loop tools if any
     return ctx.oracle.llm({
       oracle: "llm",
-      async call(layers: Layer[]) {
+      async call(_turns) {
         // Replace with your real provider (Anthropic, OpenAI, etc.)
         const userInput = layers.find(l => l.name === "input")?.content;
         return {
-          response: `Hello! You said: "${userInput}"`,
-          // toolCalls: [] — return tool calls here to trigger the tool loop
+          text: `Hello! You said: "${userInput}"`,
+          // tool_calls: [{id, name, input}] — return tool calls here to trigger the tool loop
         };
       },
-      // executeTool: (tc, ctx) => { ... } — add tools here
+      // executeTool: (tc, ctx) => { content: "..." } — add tools here
     });
   },
 };

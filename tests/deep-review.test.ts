@@ -528,7 +528,7 @@ describe("H6: AbortSignal cancels mid-execution", () => {
     const signals: Signal[] = [];
     let errorSeen: unknown = null;
     await new Promise<void>((resolve) => {
-      graph.exec$(manifest, "slow", "go", ac.signal).subscribe({
+      graph.exec$(manifest, "slow", "go", { signal: ac.signal }).subscribe({
         next: (s) => signals.push(s),
         error: (e) => { errorSeen = e; resolve(); },
         complete: () => resolve(),
